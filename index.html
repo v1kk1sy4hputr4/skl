@@ -911,7 +911,7 @@
                     <div class="text-center mb-4">
                         <i class="fas fa-graduation-cap fa-3x" style="color: var(--bg-gradient-start);"></i>
                         <h3 class="mt-2">SKL - Surat Keterangan Lulus</h3>
-                        <p class="text-muted small">Pesantren Darul Hikam</p>
+                        <p class="text-muted small">Pesantren Ibnul Jauzy</p>
                     </div>
                     
                     <div id="loginError" class="alert alert-danger d-none"></div>
@@ -1042,11 +1042,6 @@
                         <li class="nav-item">
                             <button class="nav-link" id="list-tab" data-bs-toggle="tab" data-bs-target="#list" type="button" role="tab">
                                 <i class="fas fa-list me-1"></i><span class="d-none d-sm-inline">Daftar</span><span class="d-inline d-sm-none">📋</span>
-                            </button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link" id="wa-tab" data-bs-toggle="tab" data-bs-target="#waBroadcast" type="button" role="tab">
-                                <i class="fab fa-whatsapp me-1"></i><span class="d-none d-sm-inline">Broadcast WA</span><span class="d-inline d-sm-none">📱</span>
                             </button>
                         </li>
                     </ul>
@@ -1334,32 +1329,7 @@
                                 <i class="fas fa-arrows-alt-h me-1"></i> Geser tabel ke kanan untuk melihat lengkap
                             </div>
                         </div>
-                        
-                        <!-- Tab Broadcast WhatsApp -->
-                        <div class="tab-pane fade" id="waBroadcast" role="tabpanel">
-                            <div class="row g-3">
-                                <div class="col-12">
-                                    <div class="card bg-light">
-                                        <div class="card-body">
-                                            <h6><i class="fab fa-whatsapp text-success me-2"></i>Broadcast Pengumuman Kelulusan</h6>
-                                            <p class="small text-muted">Kirim pesan WhatsApp ke semua santri yang LULUS</p>
-                                            <hr>
-                                            <div class="mb-3">
-                                                <label class="form-label">Pesan Tambahan (Opsional)</label>
-                                                <textarea class="form-control" id="waAdditionalMessage" rows="3" placeholder="Tulis pesan tambahan di sini..."></textarea>
-                                            </div>
-                                            <div class="alert alert-info">
-                                                <i class="fas fa-info-circle me-2"></i>
-                                                Pesan akan dikirim secara otomatis ke WhatsApp santri yang telah terdaftar nomornya.
-                                            </div>
-                                            <button class="btn btn-success w-100" onclick="sendBroadcastWA()" id="broadcastBtn">
-                                                <i class="fab fa-whatsapp me-2"></i>Kirim Broadcast ke Santri LULUS
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                     
                     </div>
                 </div>
             </div>
@@ -1825,7 +1795,7 @@ Demikian informasi ini kami sampaikan. Atas perhatiannya kami ucapkan terima kas
 
 *Wassalamu'alaikum Warahmatullahi Wabarakatuh*
 
-_*Pesantren Darul Hikam*_
+_*Pesantren Ibnul Jauzy*_
 _Pengumuman Kelulusan ${new Date().getFullYear()}`;
 
             const encodedMessage = encodeURIComponent(message);
@@ -1833,105 +1803,7 @@ _Pengumuman Kelulusan ${new Date().getFullYear()}`;
             window.open(waUrl, '_blank');
         }
 
-        async function sendBroadcastWA() {
-            const broadcastBtn = document.getElementById('broadcastBtn');
-            broadcastBtn.disabled = true;
-            broadcastBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Mengirim pesan...';
-            
-            try {
-                const snapshot = await db.collection('students').where('status', '==', 'LULUS').get();
-                const lulusStudents = [];
-                
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    if (data.whatsapp) {
-                        lulusStudents.push({ id: doc.id, ...data });
-                    }
-                });
-                
-                if (lulusStudents.length === 0) {
-                    showToast('Tidak ada santri LULUS dengan nomor WhatsApp terdaftar', 'error');
-                    return;
-                }
-                
-                const confirmSend = confirm(`Apakah Anda yakin ingin mengirim pesan WhatsApp ke ${lulusStudents.length} santri LULUS?\n\nPesan akan dikirim satu per satu ke WhatsApp masing-masing.`);
-                
-                if (!confirmSend) {
-                    broadcastBtn.disabled = false;
-                    broadcastBtn.innerHTML = '<i class="fab fa-whatsapp me-2"></i>Kirim Broadcast ke Santri LULUS';
-                    return;
-                }
-                
-                for (let i = 0; i < lulusStudents.length; i++) {
-                    const student = lulusStudents[i];
-                    const tempStudent = currentStudent;
-                    currentStudent = student;
-                    sendWhatsAppMessage(student.whatsapp, student.nama, student.jenjang || '-', 'LULUS', student.sklDriveUrl || 'Belum tersedia');
-                    currentStudent = tempStudent;
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    console.log(`Membuka WA untuk ${student.nama} (${i+1}/${lulusStudents.length})`);
-                }
-                
-                showToast(`Membuka ${lulusStudents.length} chat WhatsApp. Kirim pesan satu per satu.`);
-                
-            } catch (error) {
-                console.error('Error broadcast:', error);
-                showToast('Gagal mengirim broadcast', 'error');
-            } finally {
-                broadcastBtn.disabled = false;
-                broadcastBtn.innerHTML = '<i class="fab fa-whatsapp me-2"></i>Kirim Broadcast ke Santri LULUS';
-            }
-        }
 
-        document.getElementById('studentForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const simpanBtn = document.getElementById('simpanBtn');
-            simpanBtn.disabled = true;
-            simpanBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Menyimpan...';
-            
-            try {
-                const jenjang = document.getElementById('adminJenjang').value;
-                const whatsapp = document.getElementById('adminWhatsapp').value;
-                
-                if (!jenjang) {
-                    showToast('Harap pilih jenjang!', 'error');
-                    return;
-                }
-                if (!whatsapp) {
-                    showToast('Harap isi nomor WhatsApp!', 'error');
-                    return;
-                }
-                
-                const data = {
-                    nama: document.getElementById('adminNama').value,
-                    nisn: document.getElementById('adminNISN').value,
-                    whatsapp: whatsapp,
-                    jenjang: jenjang,
-                    fotoUrl: document.getElementById('adminFotoUrl').value || '',
-                    status: document.getElementById('adminStatus').value,
-                    sklDriveUrl: document.getElementById('adminSklUrl').value,
-                    updatedAt: new Date().toISOString()
-                };
-                
-                if (currentEditId) {
-                    await db.collection('students').doc(currentEditId).update(data);
-                    showToast('Data berhasil diupdate!');
-                    currentEditId = null;
-                } else {
-                    const existing = await db.collection('students').where('nisn', '==', data.nisn).get();
-                    if (!existing.empty) { showToast('NISN sudah terdaftar!', 'error'); return; }
-                    await db.collection('students').add(data);
-                    showToast('Data berhasil disimpan!');
-                }
-                resetForm();
-                loadData();
-                loadAllStudentsForMassUpload();
-                updateDashboardStats();
-                const listTab = new bootstrap.Tab(document.getElementById('list-tab'));
-                listTab.show();
-            } catch (error) { showToast('Gagal menyimpan data: ' + error.message, 'error'); }
-            finally { simpanBtn.disabled = false; simpanBtn.innerHTML = '<i class="fas fa-save me-1"></i>Simpan'; }
-        });
 
         async function loadAllStudentsForMassUpload() {
             try {
