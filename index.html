@@ -1123,6 +1123,7 @@
                         </div>
                         
                         <div class="tab-pane fade" id="add" role="tabpanel">
+                            <h6 class="mb-3" id="formTitle">Tambah Data Santri</h6>
                             <form id="studentForm">
                                 <div class="row g-2 g-md-3">
                                     <div class="col-12 col-md-6">
@@ -1171,7 +1172,7 @@
                                     </div>
                                     <div class="col-12">
                                         <div class="d-flex gap-2">
-                                            <button type="submit" class="btn btn-primary flex-fill" id="simpanBtn">
+                                            <button type="button" class="btn btn-primary flex-fill" id="simpanBtn" onclick="simpanData()">
                                                 <i class="fas fa-save me-1"></i>Simpan
                                             </button>
                                             <button type="button" class="btn btn-success" onclick="resetForm()">
@@ -1374,7 +1375,6 @@
                 document.getElementById('themeColor').setAttribute('content', '#1a1a2e');
             }
             
-            // Refresh charts when theme changes (will be recreated)
             if (typeof jenjangChart !== 'undefined' && jenjangChart) {
                 updateDashboardStats();
             }
@@ -1518,13 +1518,11 @@
                 const tidakLulus = total - lulus;
                 const persentase = total > 0 ? ((lulus / total) * 100).toFixed(1) : 0;
                 
-                // Update stat cards
                 document.getElementById('totalSantri').textContent = total;
                 document.getElementById('totalLulus').textContent = lulus;
                 document.getElementById('totalTidakLulus').textContent = tidakLulus;
                 document.getElementById('persentaseLulus').textContent = persentase + '%';
                 
-                // Data for charts
                 const wusthaCount = students.filter(s => s.jenjang === 'Wustha').length;
                 const ulyaCount = students.filter(s => s.jenjang === 'Ulya').length;
                 
@@ -1533,7 +1531,6 @@
                 const ulyaLulus = students.filter(s => s.jenjang === 'Ulya' && s.status === 'LULUS').length;
                 const ulyaTidak = students.filter(s => s.jenjang === 'Ulya' && s.status === 'TIDAK LULUS').length;
                 
-                // Update or create Jenjang Chart
                 const jenjangCtx = document.getElementById('jenjangChart').getContext('2d');
                 if (jenjangChart) jenjangChart.destroy();
                 jenjangChart = new Chart(jenjangCtx, {
@@ -1556,7 +1553,6 @@
                     }
                 });
                 
-                // Update or create Status Chart
                 const statusCtx = document.getElementById('statusChart').getContext('2d');
                 if (statusChart) statusChart.destroy();
                 statusChart = new Chart(statusCtx, {
@@ -1579,7 +1575,6 @@
                     }
                 });
                 
-                // Update or create Detail Chart (Bar chart)
                 const detailCtx = document.getElementById('detailChart').getContext('2d');
                 if (detailChart) detailChart.destroy();
                 detailChart = new Chart(detailCtx, {
@@ -1803,8 +1798,6 @@ _Pengumuman Kelulusan ${new Date().getFullYear()}`;
             window.open(waUrl, '_blank');
         }
 
-
-
         async function loadAllStudentsForMassUpload() {
             try {
                 const snapshot = await db.collection('students').get();
@@ -1948,6 +1941,94 @@ _Pengumuman Kelulusan ${new Date().getFullYear()}`;
                 reader.onerror = reject;
                 reader.readAsDataURL(file);
             });
+        }
+
+        // ==================== FUNGSI SIMPAN DATA ====================
+        async function simpanData() {
+            const nama = document.getElementById('adminNama').value.trim();
+            const nisn = document.getElementById('adminNISN').value.trim();
+            const whatsapp = document.getElementById('adminWhatsapp').value.trim();
+            const jenjang = document.getElementById('adminJenjang').value;
+            const status = document.getElementById('adminStatus').value;
+            const sklDriveUrl = document.getElementById('adminSklUrl').value.trim();
+            const fotoUrl = document.getElementById('adminFotoUrl').value;
+            
+            // Validasi
+            if (!nama || !nisn || !whatsapp || !jenjang) {
+                showToast('Harap isi semua field yang wajib!', 'error');
+                return;
+            }
+            
+            // Validasi NISN harus angka
+            if (!/^\d+$/.test(nisn)) {
+                showToast('NISN harus berupa angka!', 'error');
+                return;
+            }
+            
+            // Validasi WhatsApp
+            const cleanWhatsapp = whatsapp.replace(/\D/g, '');
+            if (cleanWhatsapp.length < 10) {
+                showToast('Nomor WhatsApp tidak valid! Minimal 10 digit.', 'error');
+                return;
+            }
+            
+            try {
+                const simpanBtn = document.getElementById('simpanBtn');
+                simpanBtn.disabled = true;
+                simpanBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Menyimpan...';
+                
+                const data = {
+                    nama,
+                    nisn,
+                    whatsapp: cleanWhatsapp,
+                    jenjang,
+                    fotoUrl: fotoUrl || '',
+                    status,
+                    sklDriveUrl: sklDriveUrl || '',
+                    updatedAt: new Date().toISOString()
+                };
+                
+                if (currentEditId) {
+                    // UPDATE data
+                    await db.collection('students').doc(currentEditId).update(data);
+                    showToast('Data berhasil diperbarui!');
+                    currentEditId = null;
+                    document.getElementById('formTitle').textContent = 'Tambah Data Santri';
+                } else {
+                    // TAMBAH data baru
+                    // Cek apakah NISN sudah terdaftar
+                    const existing = await db.collection('students').where('nisn', '==', nisn).get();
+                    if (!existing.empty) {
+                        showToast('NISN sudah terdaftar!', 'error');
+                        simpanBtn.disabled = false;
+                        simpanBtn.innerHTML = '<i class="fas fa-save me-1"></i>Simpan';
+                        return;
+                    }
+                    
+                    await db.collection('students').add({
+                        ...data,
+                        createdAt: new Date().toISOString()
+                    });
+                    showToast('Data berhasil ditambahkan!');
+                }
+                
+                resetForm();
+                loadData();
+                loadAllStudentsForMassUpload();
+                updateDashboardStats();
+                
+                // Kembali ke tab daftar
+                const listTab = new bootstrap.Tab(document.getElementById('list-tab'));
+                listTab.show();
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showToast('Gagal menyimpan data!', 'error');
+            } finally {
+                const simpanBtn = document.getElementById('simpanBtn');
+                simpanBtn.disabled = false;
+                simpanBtn.innerHTML = '<i class="fas fa-save me-1"></i>Simpan';
+            }
         }
 
         // ==================== FUNGSI HAPUS MASSAL ====================
@@ -2163,7 +2244,7 @@ _Pengumuman Kelulusan ${new Date().getFullYear()}`;
                         <button class="btn btn-sm btn-danger btn-action" onclick="confirmDelete('${doc.id}')"><i class="fas fa-trash"></i></button>
                         ${data.whatsapp && data.status === 'LULUS' ? `<button class="btn btn-sm btn-success btn-action" onclick="sendSingleWA('${doc.id}')"><i class="fab fa-whatsapp"></i></button>` : ''}
                     </td>
-                <tr>`;
+                </tr>`;
             });
             html += '</tbody></table></div>';
             studentList.innerHTML = html;
@@ -2191,20 +2272,37 @@ _Pengumuman Kelulusan ${new Date().getFullYear()}`;
             try {
                 const doc = await db.collection('students').doc(id).get();
                 const data = doc.data();
-                document.getElementById('adminNama').value = data.nama;
-                document.getElementById('adminNISN').value = data.nisn;
+                document.getElementById('adminNama').value = data.nama || '';
+                document.getElementById('adminNISN').value = data.nisn || '';
                 document.getElementById('adminWhatsapp').value = data.whatsapp || '';
                 document.getElementById('adminJenjang').value = data.jenjang || '';
                 document.getElementById('adminFotoUrl').value = data.fotoUrl || '';
-                document.getElementById('adminStatus').value = data.status;
+                document.getElementById('adminStatus').value = data.status || 'LULUS';
                 document.getElementById('adminSklUrl').value = data.sklDriveUrl || '';
-                if (data.fotoUrl) { document.getElementById('fotoPreview').src = data.fotoUrl; document.getElementById('fotoPreview').style.display = 'block'; currentFotoBase64 = data.fotoUrl; }
+                
+                if (data.fotoUrl) {
+                    document.getElementById('fotoPreview').src = data.fotoUrl;
+                    document.getElementById('fotoPreview').style.display = 'block';
+                    currentFotoBase64 = data.fotoUrl;
+                } else {
+                    document.getElementById('fotoPreview').style.display = 'none';
+                    currentFotoBase64 = null;
+                }
+                
+                // SET currentEditId UNTUK EDIT
                 currentEditId = id;
+                
+                // Ganti judul form
+                document.getElementById('formTitle').textContent = 'Edit Data Santri';
+                
                 const addTab = new bootstrap.Tab(document.getElementById('add-tab'));
                 addTab.show();
                 document.getElementById('studentForm').scrollIntoView({ behavior: 'smooth' });
                 showToast('Data siap diedit');
-            } catch (error) { showToast('Gagal memuat data untuk diedit', 'error'); }
+            } catch (error) {
+                console.error('Error edit data:', error);
+                showToast('Gagal memuat data untuk diedit', 'error');
+            }
         }
 
         function confirmDelete(id) {
@@ -2240,6 +2338,7 @@ _Pengumuman Kelulusan ${new Date().getFullYear()}`;
             currentEditId = null;
             currentFotoBase64 = null;
             document.getElementById('fotoInput').value = '';
+            document.getElementById('formTitle').textContent = 'Tambah Data Santri';
         }
 
         function downloadTemplate() {
